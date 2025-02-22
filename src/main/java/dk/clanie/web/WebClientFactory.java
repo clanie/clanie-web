@@ -31,7 +31,6 @@ import static org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY;
 import java.util.function.Consumer;
 
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
@@ -50,14 +49,15 @@ import dk.clanie.web.exception.InternalServerErrorException;
 import dk.clanie.web.exception.NotFoundException;
 import dk.clanie.web.exception.UnauthorizedException;
 import dk.clanie.web.exception.UnprocessableEntityException;
+import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
 
 @Service
+@RequiredArgsConstructor
 public class WebClientFactory {
 
-	@Autowired
-	private WebClient.Builder webClientBuilder;
+	private final WebClient.Builder webClientBuilder;
 
 
 	/**
@@ -117,5 +117,6 @@ public class WebClientFactory {
 					return Mono.error(ex);
 				});
 	}
+
 
 }
