@@ -25,6 +25,7 @@ import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.FOUND;
 import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
+import static org.springframework.http.HttpStatus.TOO_MANY_REQUESTS;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 import static org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY;
 
@@ -47,6 +48,7 @@ import dk.clanie.web.exception.ForbiddenException;
 import dk.clanie.web.exception.FoundException;
 import dk.clanie.web.exception.InternalServerErrorException;
 import dk.clanie.web.exception.NotFoundException;
+import dk.clanie.web.exception.TooManyRequestsException;
 import dk.clanie.web.exception.UnauthorizedException;
 import dk.clanie.web.exception.UnprocessableEntityException;
 import lombok.RequiredArgsConstructor;
@@ -111,6 +113,7 @@ public class WebClientFactory {
 					else if (NOT_FOUND.equals(statusCode)) ex = new NotFoundException("Not Found");
 					else if (CONFLICT.equals(statusCode)) ex = new ConflictException("Conflict");
 					else if (UNPROCESSABLE_ENTITY.equals(statusCode)) ex = new UnprocessableEntityException("Unprocessable Entity");
+					else if (TOO_MANY_REQUESTS.equals(statusCode)) ex = new TooManyRequestsException("Too Many Requests");
 					else if (statusCode.is4xxClientError()) ex = new BadRequestException("Client Error " + cr.statusCode() + ": "+ statusCode);
 					else if (INTERNAL_SERVER_ERROR.equals(statusCode)) ex = new InternalServerErrorException("Internal Server Error");
 					else ex = new InternalServerErrorException("Server Error " + cr.statusCode() + ": "+ cr.statusCode());
