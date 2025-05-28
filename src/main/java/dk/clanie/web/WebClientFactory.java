@@ -83,16 +83,15 @@ public class WebClientFactory {
 	 * @param wiretap log all requests and responses.
 	 */
 	public WebClient newWebClient(String baseUrl, @Nullable Consumer<WebClient.Builder> builderConsumer, boolean wiretap) {
-		WebClient.Builder myWebClientBuilder = webClientBuilder.clone();
-		
 		if (wiretap) {
 			LoggerContext loggerContext = (LoggerContext)LoggerFactory.getILoggerFactory();
 			loggerContext.getLogger("reactor.netty.http.client").setLevel(Level.TRACE);
-			HttpClient httpClient = HttpClient.create().wiretap(true);
-			myWebClientBuilder = myWebClientBuilder.clientConnector(new ReactorClientHttpConnector(httpClient));
 		}
-
-		return myWebClientBuilder
+		HttpClient httpClient = HttpClient.create()
+				.followRedirect(false)
+				.wiretap(wiretap);
+		return webClientBuilder.clone()
+				.clientConnector(new ReactorClientHttpConnector(httpClient))
 				.baseUrl(baseUrl)
 				.filter(responseCodeToExceptionMappingFilter())
 				.apply(opt(builderConsumer).orElse(_ -> {}))
