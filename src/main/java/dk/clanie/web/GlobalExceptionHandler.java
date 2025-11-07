@@ -15,7 +15,6 @@
  * with this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-
 package dk.clanie.web;
 
 import org.springframework.http.HttpHeaders;
@@ -30,6 +29,16 @@ import dk.clanie.web.exception.FoundException;
 public class GlobalExceptionHandler {
 
 
+	/**
+	 * Handles a {@link FoundException} (a redirect).
+	 *
+	 * Responds with HTTP 302 (FOUND) and sets the Location header to the
+	 * URL or location contained in the exception.
+	 *
+	 * @param e the exception containing the redirect location; must not be null
+	 * @return a {@link ResponseEntity} with status {@link HttpStatus#FOUND} and
+	 *         the Location header set to {@code e.getLocation()}
+	 */
 	@ExceptionHandler(FoundException.class)
 	public ResponseEntity<?> handleFoundException(FoundException e) {
 		return ResponseEntity.status(HttpStatus.FOUND)

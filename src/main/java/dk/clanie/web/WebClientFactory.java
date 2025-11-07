@@ -15,7 +15,6 @@
  * with this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-
 package dk.clanie.web;
 
 import static dk.clanie.core.Utils.opt;
@@ -58,7 +57,6 @@ import reactor.netty.http.client.HttpClient;
 public class WebClientFactory {
 
 	private final WebClient.Builder webClientBuilder;
-
 
 	/**
 	 * Gets a WebClient with given baseUrl and the filters required

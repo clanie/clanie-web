@@ -18,13 +18,17 @@
 package dk.clanie.web;
 
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.reactive.function.client.WebClient;
 
+/**
+ * {@link EnableAutoConfiguration Auto-configuration} for clanie-web.
+ */
 @AutoConfiguration
-@ConditionalOnClass(WebClient.class)
 public class ClanieWebAutoConfiguration {
 
 
@@ -36,9 +40,18 @@ public class ClanieWebAutoConfiguration {
 
 
     @Bean
+    @Lazy
     @ConditionalOnMissingBean
     WebClientFactory webClientFactory(WebClient.Builder webClientBuilder) {
         return new WebClientFactory(webClientBuilder);
+    }
+
+
+    @Bean
+    @Lazy
+    @ConditionalOnMissingBean
+    RestClientFactory restClientFactory(RestClient.Builder restClientBuilder) {
+        return new RestClientFactory(restClientBuilder);
     }
 
 
