@@ -54,7 +54,15 @@
             <groupId>io.projectreactor.netty</groupId>
             <artifactId>reactor-netty</artifactId>
         </dependency>
-  
+          <!--
+            Include Netty libs for all architectures (else osx-aarch_64 libs does not get
+            included). This probably pulls in much more than we need, but it works.
+         -->
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-all</artifactId>
+        </dependency>
+
         <!-- Logging -->
         <dependency>
             <groupId>ch.qos.logback</groupId>
