@@ -174,13 +174,9 @@ public class RestClientFactoryTest {
 		// Verify that NO request/response log events were captured
 		List<ILoggingEvent> logsList = captured.getEvents();
 
-		// Check for request logs
-		assertThat(logsList).as("Expected NO request log when wiretap is disabled")
-		.noneMatch(event -> event.getFormattedMessage().contains("Request: GET"));
-
-		// Check for response logs
-		assertThat(logsList).as("Expected NO response log when wiretap is disabled")
-		.noneMatch(event -> event.getFormattedMessage().contains("Response: 200"));
+		// Check for logs
+		assertThat(logsList).as("Expected NO log when wiretap is disabled")
+		.isEmpty();
 	}
 
 

@@ -125,11 +125,8 @@ public class RestClientFactory {
 			if (body.length > 0) {
 				log.trace("Request body: {}", new String(body));
 			}
-
 			ClientHttpResponse response = execution.execute(request, body);
-
 			log.trace("Response: {} {}", response.getStatusCode().value(), response.getStatusText());
-
 			return response;
 		};
 	}

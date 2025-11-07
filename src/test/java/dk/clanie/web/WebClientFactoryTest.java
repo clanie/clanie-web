@@ -1,5 +1,6 @@
 package dk.clanie.web;
 
+import static dk.clanie.web.WebClientFactory.WIRETAP_LOGGER_NAME;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -138,7 +139,7 @@ public class WebClientFactoryTest {
 		WebClient client = clientFactory.newWebClient(baseUrl, true);
 
 		// Capture log events while making a request
-		CapturedLoggingEvents captured = LogCapturer.capture(WebClientFactory.class, () -> {
+		CapturedLoggingEvents captured = LogCapturer.capture(WIRETAP_LOGGER_NAME, () -> {
 			String body = client.get().uri("/status/200").retrieve().bodyToMono(String.class).block();
 			assertThat(body).isEqualTo("hello");
 		});
@@ -148,14 +149,14 @@ public class WebClientFactoryTest {
 		assertThat(logsList).as("Expected log events when wiretap is enabled").isNotEmpty();
 
 		// Verify request was logged
-		assertThat(logsList).as("Expected to find request log with 'Request: GET'")
-		.anyMatch(event -> event.getLevel() == Level.TRACE 
-		&& event.getFormattedMessage().contains("Request: GET"));
+		assertThat(logsList).as("Expected to find request log with 'GET /status/200'")
+		.anyMatch(event -> event.getLevel() == Level.DEBUG 
+		&& event.getFormattedMessage().contains("GET /status/200"));
 
 		// Verify response was logged
-		assertThat(logsList).as("Expected to find response log with 'Response: 200'")
-		.anyMatch(event -> event.getLevel() == Level.TRACE 
-		&& event.getFormattedMessage().contains("Response: 200"));
+		assertThat(logsList).as("Expected to find response log with 'HTTP/1.1 200 OK'")
+		.anyMatch(event -> event.getLevel() == Level.DEBUG 
+		&& event.getFormattedMessage().contains("HTTP/1.1 200 OK"));
 	}
 
 
@@ -165,21 +166,15 @@ public class WebClientFactoryTest {
 		WebClient client = clientFactory.newWebClient(baseUrl, false);
 
 		// Capture log events while making a request
-		CapturedLoggingEvents captured = LogCapturer.capture(WebClientFactory.class, () -> {
+		CapturedLoggingEvents captured = LogCapturer.capture(WIRETAP_LOGGER_NAME, () -> {
 			String body = client.get().uri("/status/200").retrieve().bodyToMono(String.class).block();
 			assertThat(body).isEqualTo("hello");
 		});
 
 		// Verify that NO request/response log events were captured
 		List<ILoggingEvent> logsList = captured.getEvents();
-
-		// Check for request logs
 		assertThat(logsList).as("Expected NO request log when wiretap is disabled")
-		.noneMatch(event -> event.getFormattedMessage().contains("Request: GET"));
-
-		// Check for response logs
-		assertThat(logsList).as("Expected NO response log when wiretap is disabled")
-		.noneMatch(event -> event.getFormattedMessage().contains("Response: 200"));
+		.isEmpty();
 	}
 
 

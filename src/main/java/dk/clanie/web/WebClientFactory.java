@@ -56,6 +56,8 @@ import reactor.netty.http.client.HttpClient;
 @RequiredArgsConstructor
 public class WebClientFactory {
 
+	static final String WIRETAP_LOGGER_NAME = "reactor.netty.http.client";
+
 	private final WebClient.Builder webClientBuilder;
 
 	/**
@@ -81,7 +83,7 @@ public class WebClientFactory {
 	public WebClient newWebClient(String baseUrl, @Nullable Consumer<WebClient.Builder> builderConsumer, boolean wiretap) {
 		if (wiretap) {
 			LoggerContext loggerContext = (LoggerContext)LoggerFactory.getILoggerFactory();
-			loggerContext.getLogger("reactor.netty.http.client").setLevel(Level.TRACE);
+			loggerContext.getLogger(WIRETAP_LOGGER_NAME).setLevel(Level.TRACE);
 		}
 		HttpClient httpClient = HttpClient.create()
 				.followRedirect(false)
