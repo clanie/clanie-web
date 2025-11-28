@@ -1,3 +1,20 @@
+/*
+ * Copyright (C) 2025, Claus Nielsen, clausn999@gmail.com
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ */
 package dk.clanie.web;
 
 import static dk.clanie.web.WebClientFactory.WIRETAP_LOGGER_NAME;
@@ -79,12 +96,10 @@ public class WebClientFactoryTest {
 		clientFactory = new WebClientFactory(WebClient.builder());
 	}
 
-
 	@AfterEach
 	void tearDown() {
 		if (server != null) server.disposeNow();
 	}
-
 
 	@Test
 	void testSuccessfulResponse() {
@@ -93,7 +108,6 @@ public class WebClientFactoryTest {
 		assertThat(body).isEqualTo("hello");
 	}
 
-
 	@Test
 	void testFoundResponse() {
 		WebClient client = clientFactory.newWebClient(baseUrl, false);
@@ -101,7 +115,6 @@ public class WebClientFactoryTest {
 		client.get().uri("/status/302").retrieve().bodyToMono(String.class).block());
 		assertThat(((FoundException) ex).getLocation()).isEqualTo("http://example.com/redirect");
 	}
-
 
 	@ParameterizedTest(name = "status {0} -> {1}")
 	@MethodSource("testResponseCodeMappingArguments")
@@ -132,7 +145,6 @@ public class WebClientFactoryTest {
 				);
 	}
 
-
 	@Test
 	void testWiretapLogsRequests() {
 		// Create client with wiretap enabled
@@ -159,7 +171,6 @@ public class WebClientFactoryTest {
 		&& event.getFormattedMessage().contains("HTTP/1.1 200 OK"));
 	}
 
-
 	@Test
 	void testNoWiretapDoesNotLog() {
 		// Create client with wiretap disabled
@@ -176,6 +187,5 @@ public class WebClientFactoryTest {
 		assertThat(logsList).as("Expected NO request log when wiretap is disabled")
 		.isEmpty();
 	}
-
 
 }
