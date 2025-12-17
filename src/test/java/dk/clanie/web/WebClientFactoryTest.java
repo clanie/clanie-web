@@ -44,7 +44,7 @@ import dk.clanie.web.exception.InternalServerErrorException;
 import dk.clanie.web.exception.NotFoundException;
 import dk.clanie.web.exception.TooManyRequestsException;
 import dk.clanie.web.exception.UnauthorizedException;
-import dk.clanie.web.exception.UnprocessableEntityException;
+import dk.clanie.web.exception.UnprocessableContentException;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import reactor.core.publisher.Mono;
 import reactor.netty.DisposableServer;
@@ -134,7 +134,7 @@ public class WebClientFactoryTest {
 				Arguments.of(403, ForbiddenException.class),
 				Arguments.of(404, NotFoundException.class),
 				Arguments.of(409, ConflictException.class),
-				Arguments.of(422, UnprocessableEntityException.class),
+				Arguments.of(422, UnprocessableContentException.class),
 				Arguments.of(429, TooManyRequestsException.class),
 
 				// Other 4xx -> BadRequestException by mapping

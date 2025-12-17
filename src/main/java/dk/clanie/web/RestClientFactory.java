@@ -26,17 +26,17 @@ import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 import static org.springframework.http.HttpStatus.TOO_MANY_REQUESTS;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
-import static org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY;
+import static org.springframework.http.HttpStatus.UNPROCESSABLE_CONTENT;
 
 import java.util.function.Consumer;
 
+import org.jspecify.annotations.Nullable;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpRequest;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.ClientHttpResponse;
-import org.springframework.lang.Nullable;
 import org.springframework.web.client.RestClient;
 
 import ch.qos.logback.classic.Level;
@@ -49,7 +49,7 @@ import dk.clanie.web.exception.InternalServerErrorException;
 import dk.clanie.web.exception.NotFoundException;
 import dk.clanie.web.exception.TooManyRequestsException;
 import dk.clanie.web.exception.UnauthorizedException;
-import dk.clanie.web.exception.UnprocessableEntityException;
+import dk.clanie.web.exception.UnprocessableContentException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -101,7 +101,7 @@ public class RestClientFactory {
 							else if (FORBIDDEN.equals(statusCode)) ex = new ForbiddenException("Forbidden");
 							else if (NOT_FOUND.equals(statusCode)) ex = new NotFoundException("Not Found");
 							else if (CONFLICT.equals(statusCode)) ex = new ConflictException("Conflict");
-							else if (UNPROCESSABLE_ENTITY.equals(statusCode)) ex = new UnprocessableEntityException("Unprocessable Entity");
+							else if (UNPROCESSABLE_CONTENT.equals(statusCode)) ex = new UnprocessableContentException("Unprocessable Content");
 							else if (TOO_MANY_REQUESTS.equals(statusCode)) ex = new TooManyRequestsException("Too Many Requests");
 							else if (statusCode.is4xxClientError()) ex = new BadRequestException("Client Error " + statusCode.value() + ": " + statusCode);
 							else if (INTERNAL_SERVER_ERROR.equals(statusCode)) ex = new InternalServerErrorException("Internal Server Error");

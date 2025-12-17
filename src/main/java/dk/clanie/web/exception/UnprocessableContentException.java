@@ -26,6 +26,6 @@ import lombok.experimental.StandardException;
 @StandardException
 @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
 @SuppressWarnings("serial")
-public class UnprocessableEntityException extends RuntimeException {
+public class UnprocessableContentException extends RuntimeException {
 
 }
