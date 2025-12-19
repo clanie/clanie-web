@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import lombok.experimental.StandardException;
 
 @StandardException
-@ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
+@ResponseStatus(HttpStatus.UNPROCESSABLE_CONTENT)
 @SuppressWarnings("serial")
 public class UnprocessableContentException extends RuntimeException {
 
