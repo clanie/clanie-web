@@ -122,6 +122,7 @@ public class RestClientFactory {
 	private static ClientHttpRequestInterceptor loggingInterceptor() {
 		return (HttpRequest request, byte[] body, org.springframework.http.client.ClientHttpRequestExecution execution) -> {
 			log.trace("Request: {} {}", request.getMethod(), request.getURI());
+			request.getHeaders().forEach((name, values) -> log.trace("Request header: {}={}", name, values));
 			if (body.length > 0) {
 				log.trace("Request body: {}", new String(body));
 			}
