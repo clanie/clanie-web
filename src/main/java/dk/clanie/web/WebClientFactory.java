@@ -18,15 +18,7 @@
 package dk.clanie.web;
 
 import static dk.clanie.core.Utils.opt;
-import static org.springframework.http.HttpStatus.BAD_REQUEST;
-import static org.springframework.http.HttpStatus.CONFLICT;
-import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.FOUND;
-import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
-import static org.springframework.http.HttpStatus.NOT_FOUND;
-import static org.springframework.http.HttpStatus.TOO_MANY_REQUESTS;
-import static org.springframework.http.HttpStatus.UNAUTHORIZED;
-import static org.springframework.http.HttpStatus.UNPROCESSABLE_CONTENT;
 
 import java.util.function.Consumer;
 
@@ -40,15 +32,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.LoggerContext;
-import dk.clanie.web.exception.BadRequestException;
-import dk.clanie.web.exception.ConflictException;
-import dk.clanie.web.exception.ForbiddenException;
 import dk.clanie.web.exception.FoundException;
-import dk.clanie.web.exception.InternalServerErrorException;
-import dk.clanie.web.exception.NotFoundException;
-import dk.clanie.web.exception.TooManyRequestsException;
-import dk.clanie.web.exception.UnauthorizedException;
-import dk.clanie.web.exception.UnprocessableContentException;
 import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
@@ -102,19 +86,18 @@ public class WebClientFactory {
 				cr -> {
 					HttpStatusCode statusCode = cr.statusCode();
 					if (statusCode.is2xxSuccessful()) return Mono.just(cr);
-					RuntimeException ex = null;
-					if (FOUND.equals(statusCode)) ex = new FoundException(cr.headers().header(HttpHeaders.LOCATION).get(0));
-					else if (BAD_REQUEST.equals(statusCode)) ex = new BadRequestException("Bad Request");
-					else if (UNAUTHORIZED.equals(statusCode)) ex = new UnauthorizedException("Unauthorized");
-					else if (FORBIDDEN.equals(statusCode)) ex = new ForbiddenException("Forbidden");
-					else if (NOT_FOUND.equals(statusCode)) ex = new NotFoundException("Not Found");
-					else if (CONFLICT.equals(statusCode)) ex = new ConflictException("Conflict");
-					else if (UNPROCESSABLE_CONTENT.equals(statusCode)) ex = new UnprocessableContentException("Unprocessable Content");
-					else if (TOO_MANY_REQUESTS.equals(statusCode)) ex = new TooManyRequestsException("Too Many Requests");
-					else if (statusCode.is4xxClientError()) ex = new BadRequestException("Client Error " + cr.statusCode() + ": "+ statusCode);
-					else if (INTERNAL_SERVER_ERROR.equals(statusCode)) ex = new InternalServerErrorException("Internal Server Error");
-					else ex = new InternalServerErrorException("Server Error " + cr.statusCode() + ": "+ cr.statusCode());
-					return Mono.error(ex);
+					// A redirect carries its destination in a header, not a body.
+					if (FOUND.equals(statusCode)) {
+						return Mono.error(new FoundException(cr.headers().header(HttpHeaders.LOCATION).get(0)));
+					}
+					// The response is an error, so nothing else will read the body. Draining
+					// it here puts the server's explanation - the API's own error code and
+					// message - into the exception, instead of just the bare status name.
+					return cr.bodyToMono(String.class)
+							.defaultIfEmpty("")
+							.onErrorReturn("")
+							.map(body -> HttpErrorMapping.toException(statusCode, body))
+							.flatMap(Mono::error);
 				});
 	}
 

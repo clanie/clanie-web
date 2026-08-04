@@ -18,16 +18,10 @@
 package dk.clanie.web;
 
 import static dk.clanie.core.Utils.opt;
-import static org.springframework.http.HttpStatus.BAD_REQUEST;
-import static org.springframework.http.HttpStatus.CONFLICT;
-import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.FOUND;
-import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
-import static org.springframework.http.HttpStatus.NOT_FOUND;
-import static org.springframework.http.HttpStatus.TOO_MANY_REQUESTS;
-import static org.springframework.http.HttpStatus.UNAUTHORIZED;
-import static org.springframework.http.HttpStatus.UNPROCESSABLE_CONTENT;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.function.Consumer;
 
 import org.jspecify.annotations.Nullable;
@@ -41,15 +35,7 @@ import org.springframework.web.client.RestClient;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.LoggerContext;
-import dk.clanie.web.exception.BadRequestException;
-import dk.clanie.web.exception.ConflictException;
-import dk.clanie.web.exception.ForbiddenException;
 import dk.clanie.web.exception.FoundException;
-import dk.clanie.web.exception.InternalServerErrorException;
-import dk.clanie.web.exception.NotFoundException;
-import dk.clanie.web.exception.TooManyRequestsException;
-import dk.clanie.web.exception.UnauthorizedException;
-import dk.clanie.web.exception.UnprocessableContentException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -91,22 +77,15 @@ public class RestClientFactory {
 						statusCode -> !statusCode.is2xxSuccessful(),
 						(_, response) -> {
 							HttpStatusCode statusCode = response.getStatusCode();
-							RuntimeException ex = null;
+							// A redirect carries its destination in a header, not a body.
 							if (FOUND.equals(statusCode)) {
 								String location = response.getHeaders().getFirst(HttpHeaders.LOCATION);
-								ex = new FoundException(location != null ? location : "");
+								throw new FoundException(location != null ? location : "");
 							}
-							else if (BAD_REQUEST.equals(statusCode)) ex = new BadRequestException("Bad Request");
-							else if (UNAUTHORIZED.equals(statusCode)) ex = new UnauthorizedException("Unauthorized");
-							else if (FORBIDDEN.equals(statusCode)) ex = new ForbiddenException("Forbidden");
-							else if (NOT_FOUND.equals(statusCode)) ex = new NotFoundException("Not Found");
-							else if (CONFLICT.equals(statusCode)) ex = new ConflictException("Conflict");
-							else if (UNPROCESSABLE_CONTENT.equals(statusCode)) ex = new UnprocessableContentException("Unprocessable Content");
-							else if (TOO_MANY_REQUESTS.equals(statusCode)) ex = new TooManyRequestsException("Too Many Requests");
-							else if (statusCode.is4xxClientError()) ex = new BadRequestException("Client Error " + statusCode.value() + ": " + statusCode);
-							else if (INTERNAL_SERVER_ERROR.equals(statusCode)) ex = new InternalServerErrorException("Internal Server Error");
-							else ex = new InternalServerErrorException("Server Error " + statusCode.value() + ": " + statusCode);
-							throw ex;
+							// The response is an error, so nothing else will read the body.
+							// Draining it here puts the server's own error code and message
+							// into the exception, instead of just the bare status name.
+							throw HttpErrorMapping.toException(statusCode, readBodyQuietly(response));
 						});
 
 		if (wiretap) {
@@ -116,6 +95,20 @@ public class RestClientFactory {
 		return builder
 				.apply(opt(builderConsumer).orElse(_ -> {}))
 				.build();
+	}
+
+
+	/**
+	 * The error response's body, or {@code null} if it cannot be read. A body we failed to
+	 * read must not replace the status the server actually sent, so read errors are swallowed.
+	 */
+	private static @Nullable String readBodyQuietly(ClientHttpResponse response) {
+		try {
+			return new String(response.getBody().readAllBytes(), StandardCharsets.UTF_8);
+		} catch (IOException e) {
+			log.debug("Could not read error response body.", e);
+			return null;
+		}
 	}
 
 

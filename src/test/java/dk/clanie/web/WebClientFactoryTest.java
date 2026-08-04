@@ -59,6 +59,8 @@ import reactor.netty.http.server.HttpServer;
  */
 public class WebClientFactoryTest {
 
+	private static final String ERROR_BODY = "{\n  \"ErrorCode\": \"NoMarketDataAccess\",\n  \"Message\": \"Not entitled\"\n}";
+
 	private DisposableServer server;
 	private String baseUrl;
 	private WebClientFactory clientFactory;
@@ -71,6 +73,16 @@ public class WebClientFactoryTest {
 				.port(0)
 				.handle((request, response) -> {
 					String uri = request.uri();
+					// An error body longer than what the exception message may carry.
+					if ("/long-error-body".equals(uri)) {
+						response.status(400);
+						return response.sendString(Mono.just("x".repeat(HttpErrorMapping.MAX_BODY_IN_EXCEPTION_MESSAGE * 3)));
+					}
+					// Error responses carrying an explanation, like a real API's error payload.
+					if (uri != null && uri.startsWith("/status-with-body/")) {
+						response.status(Integer.parseInt(uri.substring("/status-with-body/".length())));
+						return response.sendString(Mono.just(ERROR_BODY));
+					}
 					if (uri != null && uri.startsWith("/status/")) {
 						String codeStr = uri.substring("/status/".length());
 						int code;
@@ -124,6 +136,38 @@ public class WebClientFactoryTest {
 		// all parameterized cases are expected to throw an exception
 		assertThrows(expectedException, () ->
 		client.get().uri(uri).retrieve().bodyToMono(String.class).block());
+	}
+
+	@Test
+	void errorResponseBodyIsCarriedIntoTheExceptionMessage() {
+		WebClient client = clientFactory.newWebClient(baseUrl, false);
+		Throwable ex = assertThrows(ForbiddenException.class, () ->
+		client.get().uri("/status-with-body/403").retrieve().bodyToMono(String.class).block());
+		// The status name stays the prefix; the server's own explanation follows it,
+		// collapsed onto one line.
+		assertThat(ex.getMessage())
+		.startsWith("Forbidden: ")
+		.contains("NoMarketDataAccess")
+		.contains("Not entitled")
+		.doesNotContain("\n");
+	}
+
+	@Test
+	void errorResponseWithoutBodyKeepsTheBareStatusName() {
+		WebClient client = clientFactory.newWebClient(baseUrl, false);
+		Throwable ex = assertThrows(ForbiddenException.class, () ->
+		client.get().uri("/status/403").retrieve().bodyToMono(String.class).block());
+		assertThat(ex.getMessage()).isEqualTo("Forbidden");
+	}
+
+	@Test
+	void longErrorResponseBodyIsTruncated() {
+		WebClient client = clientFactory.newWebClient(baseUrl, false);
+		Throwable ex = assertThrows(BadRequestException.class, () ->
+		client.get().uri("/long-error-body").retrieve().bodyToMono(String.class).block());
+		assertThat(ex.getMessage())
+		.hasSizeLessThan(HttpErrorMapping.MAX_BODY_IN_EXCEPTION_MESSAGE + 50)
+		.endsWith("…");
 	}
 
 	static Stream<Arguments> testResponseCodeMappingArguments() {
