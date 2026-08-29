@@ -42,6 +42,8 @@ public class WebClientFactory {
 
 	static final String WIRETAP_LOGGER_NAME = "reactor.netty.http.client";
 
+	private static final byte[] EMPTY_BODY = new byte[0];
+
 	private final WebClient.Builder webClientBuilder;
 
 	/**
@@ -93,9 +95,11 @@ public class WebClientFactory {
 					// The response is an error, so nothing else will read the body. Draining
 					// it here puts the server's explanation - the API's own error code and
 					// message - into the exception, instead of just the bare status name.
-					return cr.bodyToMono(String.class)
-							.defaultIfEmpty("")
-							.onErrorReturn("")
+					// Read it as bytes, not as a String: a gzipped error body decoded as
+					// text is mojibake, and only the bytes still carry the explanation.
+					return cr.bodyToMono(byte[].class)
+							.defaultIfEmpty(EMPTY_BODY)
+							.onErrorReturn(EMPTY_BODY)
 							.map(body -> HttpErrorMapping.toException(statusCode, body))
 							.flatMap(Mono::error);
 				});

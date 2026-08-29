@@ -26,6 +26,11 @@ import static org.springframework.http.HttpStatus.TOO_MANY_REQUESTS;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 import static org.springframework.http.HttpStatus.UNPROCESSABLE_CONTENT;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.zip.GZIPInputStream;
+
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatusCode;
 
@@ -56,8 +61,62 @@ public class HttpErrorMapping {
 	 */
 	static final int MAX_BODY_IN_EXCEPTION_MESSAGE = 500;
 
+	/**
+	 * Maximum number of bytes read out of a compressed error body. Only
+	 * {@link #MAX_BODY_IN_EXCEPTION_MESSAGE} characters ever reach the message, so this
+	 * only has to be generous enough not to cut an explanation short - and small enough
+	 * that a hostile or broken server cannot inflate a few bytes into a heap dump.
+	 */
+	static final int MAX_DECOMPRESSED_BODY_BYTES = 64 * 1024;
+
 
 	private HttpErrorMapping() {}
+
+
+	/** The body as text, decompressing it first when it is gzipped. */
+	static @Nullable String decodeBody(byte @Nullable [] body) {
+		if (body == null) return null;
+		return new String(isGzipped(body) ? gunzipQuietly(body) : body, StandardCharsets.UTF_8);
+	}
+
+
+	/**
+	 * Whether the body carries gzip's magic number. The bytes are sniffed rather than the
+	 * {@code Content-Encoding} header read, because neither factory's HTTP client asks for
+	 * compression, so neither decompresses on its own - a declared encoding and an
+	 * undeclared one both arrive here still compressed, and the magic number covers both.
+	 */
+	private static boolean isGzipped(byte[] body) {
+		return body.length >= 2 && (body[0] & 0xFF) == 0x1F && (body[1] & 0xFF) == 0x8B;
+	}
+
+
+	/**
+	 * The inflated body, or the bytes as they came when they only looked gzipped. A body
+	 * we failed to inflate must not become no body at all - unreadable bytes still say
+	 * more than a bare status name.
+	 */
+	private static byte[] gunzipQuietly(byte[] body) {
+		try (GZIPInputStream in = new GZIPInputStream(new ByteArrayInputStream(body))) {
+			return in.readNBytes(MAX_DECOMPRESSED_BODY_BYTES);
+		} catch (IOException e) {
+			return body;
+		}
+	}
+
+
+	/**
+	 * The exception for the given error status, with the decoded {@code body} appended to
+	 * its message.
+	 * <p>
+	 * Servers gzip error responses whether or not the client asked them to - Saxo's
+	 * gateway does - and reading those bytes as text turns the API's own explanation into
+	 * mojibake that no amount of log-reading can undo. So the bytes are decompressed
+	 * first when they carry the gzip magic number.
+	 */
+	public static RuntimeException toException(HttpStatusCode statusCode, byte @Nullable [] body) {
+		return toException(statusCode, decodeBody(body));
+	}
 
 
 	/** The exception for the given error status, with {@code body} appended to its message. */

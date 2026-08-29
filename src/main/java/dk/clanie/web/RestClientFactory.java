@@ -21,7 +21,6 @@ import static dk.clanie.core.Utils.opt;
 import static org.springframework.http.HttpStatus.FOUND;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.function.Consumer;
 
 import org.jspecify.annotations.Nullable;
@@ -99,12 +98,14 @@ public class RestClientFactory {
 
 
 	/**
-	 * The error response's body, or {@code null} if it cannot be read. A body we failed to
-	 * read must not replace the status the server actually sent, so read errors are swallowed.
+	 * The error response's body bytes, or {@code null} if they cannot be read. A body we
+	 * failed to read must not replace the status the server actually sent, so read errors
+	 * are swallowed. The bytes are handed on undecoded because an error body may be
+	 * gzipped - {@link HttpErrorMapping} is what turns them into text.
 	 */
-	private static @Nullable String readBodyQuietly(ClientHttpResponse response) {
+	private static byte @Nullable [] readBodyQuietly(ClientHttpResponse response) {
 		try {
-			return new String(response.getBody().readAllBytes(), StandardCharsets.UTF_8);
+			return response.getBody().readAllBytes();
 		} catch (IOException e) {
 			log.debug("Could not read error response body.", e);
 			return null;

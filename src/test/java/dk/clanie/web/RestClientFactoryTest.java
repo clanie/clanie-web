@@ -21,8 +21,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.stream.Stream;
+import java.util.zip.GZIPOutputStream;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,6 +64,8 @@ import reactor.netty.http.server.HttpServer;
  */
 public class RestClientFactoryTest {
 
+	private static final String ERROR_BODY = "{\n  \"ErrorCode\": \"NoMarketDataAccess\",\n  \"Message\": \"Not entitled\"\n}";
+
 	private DisposableServer server;
 	private String baseUrl;
 	private RestClientFactory clientFactory;
@@ -72,6 +79,12 @@ public class RestClientFactoryTest {
 				.port(0)
 				.handle((request, response) -> {
 					String uri = request.uri();
+					// An error body the server gzipped without being asked to, as Saxo's
+					// gateway does.
+					if ("/gzipped-error-body".equals(uri)) {
+						response.status(403);
+						return response.sendByteArray(Mono.just(gzip(ERROR_BODY)));
+					}
 					if (uri != null && uri.startsWith("/status/")) {
 						String codeStr = uri.substring("/status/".length());
 						int code;
@@ -128,6 +141,30 @@ public class RestClientFactoryTest {
 		assertThrows(expectedException, () ->
 		client.get().uri(uri).retrieve().body(String.class));
 	}
+
+	@Test
+	void gzippedErrorResponseBodyIsDecompressedIntoTheExceptionMessage() {
+		RestClient client = clientFactory.newRestClient(baseUrl, false);
+		Throwable ex = assertThrows(ForbiddenException.class, () ->
+		client.get().uri("/gzipped-error-body").retrieve().body(String.class));
+		// Without decompression this reads as mojibake and the explanation is lost.
+		assertThat(ex.getMessage())
+		.startsWith("Forbidden: ")
+		.contains("NoMarketDataAccess")
+		.contains("Not entitled");
+	}
+
+
+	private static byte[] gzip(String text) {
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		try (GZIPOutputStream gzip = new GZIPOutputStream(out)) {
+			gzip.write(text.getBytes(StandardCharsets.UTF_8));
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+		return out.toByteArray();
+	}
+
 
 	static Stream<Arguments> testResponseCodeMappingArguments() {
 		return Stream.of(
