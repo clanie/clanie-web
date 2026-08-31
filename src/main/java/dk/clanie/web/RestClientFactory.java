@@ -83,8 +83,11 @@ public class RestClientFactory {
 							}
 							// The response is an error, so nothing else will read the body.
 							// Draining it here puts the server's own error code and message
-							// into the exception, instead of just the bare status name.
-							throw HttpErrorMapping.toException(statusCode, readBodyQuietly(response));
+							// into the exception, instead of just the bare status name. The
+							// headers go along for the server's correlation id - the one
+							// thing an API's support desk needs to find the failure on their
+							// side.
+							throw HttpErrorMapping.toException(statusCode, readBodyQuietly(response), response.getHeaders());
 						});
 
 		if (wiretap) {

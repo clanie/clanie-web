@@ -97,10 +97,13 @@ public class WebClientFactory {
 					// message - into the exception, instead of just the bare status name.
 					// Read it as bytes, not as a String: a gzipped error body decoded as
 					// text is mojibake, and only the bytes still carry the explanation.
+					// The headers go along for the server's correlation id - the one thing
+					// an API's support desk needs to find the failure on their side.
+					HttpHeaders headers = cr.headers().asHttpHeaders();
 					return cr.bodyToMono(byte[].class)
 							.defaultIfEmpty(EMPTY_BODY)
 							.onErrorReturn(EMPTY_BODY)
-							.map(body -> HttpErrorMapping.toException(statusCode, body))
+							.map(body -> HttpErrorMapping.toException(statusCode, body, headers))
 							.flatMap(Mono::error);
 				});
 	}

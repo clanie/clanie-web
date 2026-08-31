@@ -65,6 +65,7 @@ import reactor.netty.http.server.HttpServer;
 public class WebClientFactoryTest {
 
 	private static final String ERROR_BODY = "{\n  \"ErrorCode\": \"NoMarketDataAccess\",\n  \"Message\": \"Not entitled\"\n}";
+	private static final String CORRELATION_ID = "e3b0c442-98fc-1c14-9afb-f4c8996fb924";
 
 	private DisposableServer server;
 	private String baseUrl;
@@ -81,6 +82,19 @@ public class WebClientFactoryTest {
 					// An error body longer than what the exception message may carry.
 					if ("/long-error-body".equals(uri)) {
 						response.status(400);
+						return response.sendString(Mono.just("x".repeat(HttpErrorMapping.MAX_BODY_IN_EXCEPTION_MESSAGE * 3)));
+					}
+					// An error carrying the server's own id for the failed request, as
+					// Saxo's gateway does - that id is what their support desk asks for.
+					if ("/correlated-error".equals(uri)) {
+						response.status(403);
+						response.header(HttpErrorMapping.CORRELATION_HEADER, CORRELATION_ID);
+						return response.sendString(Mono.just(ERROR_BODY));
+					}
+					// The same, behind an error body too long to fit in the message.
+					if ("/correlated-long-error".equals(uri)) {
+						response.status(403);
+						response.header(HttpErrorMapping.CORRELATION_HEADER, CORRELATION_ID);
 						return response.sendString(Mono.just("x".repeat(HttpErrorMapping.MAX_BODY_IN_EXCEPTION_MESSAGE * 3)));
 					}
 					// An error body the server gzipped without being asked to, as Saxo's
@@ -189,6 +203,28 @@ public class WebClientFactoryTest {
 		assertThat(ex.getMessage())
 		.startsWith("Forbidden: ")
 		.contains("NoMarketDataAccess");
+	}
+
+	@Test
+	void correlationIdIsCarriedIntoTheExceptionMessage() {
+		WebClient client = clientFactory.newWebClient(baseUrl, false);
+		Throwable ex = assertThrows(ForbiddenException.class, () ->
+		client.get().uri("/correlated-error").retrieve().bodyToMono(String.class).block());
+		// Without it, a report of a server-side fault cannot be traced back to the
+		// request that hit it.
+		assertThat(ex.getMessage())
+		.contains("NoMarketDataAccess")
+		.endsWith("[" + HttpErrorMapping.CORRELATION_HEADER + ": " + CORRELATION_ID + "]");
+	}
+
+	@Test
+	void correlationIdSurvivesAnErrorBodyTooLongToFitInTheMessage() {
+		WebClient client = clientFactory.newWebClient(baseUrl, false);
+		Throwable ex = assertThrows(ForbiddenException.class, () ->
+		client.get().uri("/correlated-long-error").retrieve().bodyToMono(String.class).block());
+		// The body is truncated first, so a long error page cannot push the id out.
+		assertThat(ex.getMessage())
+		.endsWith("[" + HttpErrorMapping.CORRELATION_HEADER + ": " + CORRELATION_ID + "]");
 	}
 
 	@Test

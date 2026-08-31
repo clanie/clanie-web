@@ -65,6 +65,7 @@ import reactor.netty.http.server.HttpServer;
 public class RestClientFactoryTest {
 
 	private static final String ERROR_BODY = "{\n  \"ErrorCode\": \"NoMarketDataAccess\",\n  \"Message\": \"Not entitled\"\n}";
+	private static final String CORRELATION_ID = "e3b0c442-98fc-1c14-9afb-f4c8996fb924";
 
 	private DisposableServer server;
 	private String baseUrl;
@@ -84,6 +85,13 @@ public class RestClientFactoryTest {
 					if ("/gzipped-error-body".equals(uri)) {
 						response.status(403);
 						return response.sendByteArray(Mono.just(gzip(ERROR_BODY)));
+					}
+					// An error carrying the server's own id for the failed request, as
+					// Saxo's gateway does - that id is what their support desk asks for.
+					if ("/correlated-error".equals(uri)) {
+						response.status(403);
+						response.header(HttpErrorMapping.CORRELATION_HEADER, CORRELATION_ID);
+						return response.sendString(Mono.just(ERROR_BODY));
 					}
 					if (uri != null && uri.startsWith("/status/")) {
 						String codeStr = uri.substring("/status/".length());
@@ -152,6 +160,19 @@ public class RestClientFactoryTest {
 		.startsWith("Forbidden: ")
 		.contains("NoMarketDataAccess")
 		.contains("Not entitled");
+	}
+
+
+	@Test
+	void correlationIdIsCarriedIntoTheExceptionMessage() {
+		RestClient client = clientFactory.newRestClient(baseUrl, false);
+		Throwable ex = assertThrows(ForbiddenException.class, () ->
+		client.get().uri("/correlated-error").retrieve().body(String.class));
+		// Without it, a report of a server-side fault cannot be traced back to the
+		// request that hit it.
+		assertThat(ex.getMessage())
+		.contains("NoMarketDataAccess")
+		.endsWith("[" + HttpErrorMapping.CORRELATION_HEADER + ": " + CORRELATION_ID + "]");
 	}
 
 

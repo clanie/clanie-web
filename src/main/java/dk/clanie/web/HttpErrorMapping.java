@@ -32,6 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.zip.GZIPInputStream;
 
 import org.jspecify.annotations.Nullable;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 
 import dk.clanie.web.exception.BadRequestException;
@@ -68,6 +69,22 @@ public class HttpErrorMapping {
 	 * that a hostile or broken server cannot inflate a few bytes into a heap dump.
 	 */
 	static final int MAX_DECOMPRESSED_BODY_BYTES = 64 * 1024;
+
+	/**
+	 * Response header carrying the server's own id for the failed request. Saxo's OpenAPI
+	 * gateway sets it, and their support asks for it in every ticket - without it a report
+	 * of a server-side fault cannot be traced back to the request that hit it. Only this
+	 * one name is looked for: no other API this module talks to has been seen to send a
+	 * correlation header, and guessing at names none of them use would be noise.
+	 */
+	static final String CORRELATION_HEADER = "X-Correlation";
+
+	/**
+	 * Maximum number of correlation-id characters carried in the exception message. Real
+	 * ids are short; the cap only stops a broken or hostile server from pushing the
+	 * server's actual explanation out of the message with a header of its own.
+	 */
+	static final int MAX_CORRELATION_ID_LENGTH = 100;
 
 
 	private HttpErrorMapping() {}
@@ -115,22 +132,68 @@ public class HttpErrorMapping {
 	 * first when they carry the gzip magic number.
 	 */
 	public static RuntimeException toException(HttpStatusCode statusCode, byte @Nullable [] body) {
-		return toException(statusCode, decodeBody(body));
+		return toException(statusCode, decodeBody(body), null);
+	}
+
+
+	/**
+	 * The exception for the given error status, with the decoded {@code body} and the
+	 * server's correlation id, when {@code headers} carry one, appended to its message.
+	 *
+	 * @see #CORRELATION_HEADER
+	 */
+	public static RuntimeException toException(HttpStatusCode statusCode, byte @Nullable [] body, @Nullable HttpHeaders headers) {
+		return toException(statusCode, decodeBody(body), correlationId(headers));
 	}
 
 
 	/** The exception for the given error status, with {@code body} appended to its message. */
 	public static RuntimeException toException(HttpStatusCode statusCode, @Nullable String body) {
-		if (BAD_REQUEST.equals(statusCode)) return new BadRequestException(withBody("Bad Request", body));
-		if (UNAUTHORIZED.equals(statusCode)) return new UnauthorizedException(withBody("Unauthorized", body));
-		if (FORBIDDEN.equals(statusCode)) return new ForbiddenException(withBody("Forbidden", body));
-		if (NOT_FOUND.equals(statusCode)) return new NotFoundException(withBody("Not Found", body));
-		if (CONFLICT.equals(statusCode)) return new ConflictException(withBody("Conflict", body));
-		if (UNPROCESSABLE_CONTENT.equals(statusCode)) return new UnprocessableContentException(withBody("Unprocessable Content", body));
-		if (TOO_MANY_REQUESTS.equals(statusCode)) return new TooManyRequestsException(withBody("Too Many Requests", body));
-		if (statusCode.is4xxClientError()) return new BadRequestException(withBody("Client Error " + statusCode, body));
-		if (INTERNAL_SERVER_ERROR.equals(statusCode)) return new InternalServerErrorException(withBody("Internal Server Error", body));
-		return new InternalServerErrorException(withBody("Server Error " + statusCode, body));
+		return toException(statusCode, body, null);
+	}
+
+
+	private static RuntimeException toException(HttpStatusCode statusCode, @Nullable String body, @Nullable String correlationId) {
+		if (BAD_REQUEST.equals(statusCode)) return new BadRequestException(message(correlationId, "Bad Request", body));
+		if (UNAUTHORIZED.equals(statusCode)) return new UnauthorizedException(message(correlationId, "Unauthorized", body));
+		if (FORBIDDEN.equals(statusCode)) return new ForbiddenException(message(correlationId, "Forbidden", body));
+		if (NOT_FOUND.equals(statusCode)) return new NotFoundException(message(correlationId, "Not Found", body));
+		if (CONFLICT.equals(statusCode)) return new ConflictException(message(correlationId, "Conflict", body));
+		if (UNPROCESSABLE_CONTENT.equals(statusCode)) return new UnprocessableContentException(message(correlationId, "Unprocessable Content", body));
+		if (TOO_MANY_REQUESTS.equals(statusCode)) return new TooManyRequestsException(message(correlationId, "Too Many Requests", body));
+		if (statusCode.is4xxClientError()) return new BadRequestException(message(correlationId, "Client Error " + statusCode, body));
+		if (INTERNAL_SERVER_ERROR.equals(statusCode)) return new InternalServerErrorException(message(correlationId, "Internal Server Error", body));
+		return new InternalServerErrorException(message(correlationId, "Server Error " + statusCode, body));
+	}
+
+
+	/**
+	 * The exception message: the status name, the response body, and the server's
+	 * correlation id. The id goes on last, <em>after</em> the body has been truncated, so
+	 * a long error page cannot push the one value Saxo's support asks for out of the
+	 * message.
+	 */
+	private static String message(@Nullable String correlationId, String statusText, @Nullable String body) {
+		return withCorrelationId(withBody(statusText, body), correlationId);
+	}
+
+
+	/** The correlation id from the response headers, or {@code null} when there is none. */
+	static @Nullable String correlationId(@Nullable HttpHeaders headers) {
+		if (headers == null) return null;
+		String id = headers.getFirst(CORRELATION_HEADER);
+		return id == null || id.isBlank() ? null : id.strip();
+	}
+
+
+	/** Appends the correlation id, truncated, to an already-built message. */
+	static String withCorrelationId(String message, @Nullable String correlationId) {
+		if (correlationId == null || correlationId.isBlank()) return message;
+		String trimmed = correlationId.strip();
+		if (trimmed.length() > MAX_CORRELATION_ID_LENGTH) {
+			trimmed = trimmed.substring(0, MAX_CORRELATION_ID_LENGTH) + "\u2026";
+		}
+		return message + " [" + CORRELATION_HEADER + ": " + trimmed + "]";
 	}
 
 
